@@ -9,47 +9,44 @@ jobs:
   send-weather:
     runs-on: ubuntu-latest
     steps:
-      - name: 拉取天气并发送企业微信
+      - name: 发送天气到企业微信
         env:
           QWEATHER_KEY: ${{ secrets.QWEATHER_KEY }}
           WECOM_KEY: ${{ secrets.WECOM_KEY }}
         run: |
-          LOCATION_ID="101300501"
+          # 1. 获取实时天气
+          WEATHER=$(curl -s "https://devapi.qweather.com/v7/weather/now?location=101300501&key=${QWEATHER_KEY}")
+          TEXT=$(echo "$WEATHER" | jq -r '.now.text')
+          TEMP=$(echo "$WEATHER" | jq -r '.now.temp')
+          WINDDIR=$(echo "$WEATHER" | jq -r '.now.windDir')
+          WINDSCALE=$(echo "$WEATHER" | jq -r '.now.windScale')
 
-          # 实时天气
-          weather_json=$(curl -s "https://devapi.qweather.com/v7/weather/now?location=$LOCATION_ID&key=$QWEATHER_KEY")
-          text=$(echo "$weather_json" | jq -r '.now.text // "未知"')
-          temp=$(echo "$weather_json" | jq -r '.now.temp // "?"')
-          windDir=$(echo "$weather_json" | jq -r '.now.windDir // ""')
-          windScale=$(echo "$weather_json" | jq -r '.now.windScale // ""')
-          humidity=$(echo "$weather_json" | jq -r '.now.humidity // ""')
+          # 2. 获取预警
+          WARNING=$(curl -s "https://devapi.qweather.com/v7/warning/now?location=101300501&key=${QWEATHER_KEY}")
+          WARNING_TITLE=$(echo "$WARNING" | jq -r '.warningList[0].title // empty')
 
-          # 预警
-          warning_json=$(curl -s "https://devapi.qweather.com/v7/warning/now?location=$LOCATION_ID&key=$QWEATHER_KEY")
-          warning_title=$(echo "$warning_json" | jq -r '.warningList[0].title // ""')
-
-          if [ -z "$warning_title" ]; then
-            warning_line='<font color="info">无</font>'
+          if [ -z "$WARNING_TITLE" ]; then
+            WARNING_LINE='<font color="info">无</font>'
           else
-            warning_line="<font color=\"warning\">$warning_title</font>"
+            WARNING_LINE="<font color=\"warning\">${WARNING_TITLE}</font>"
           fi
 
-          # 日期
-          date_str=$(TZ=Asia/Shanghai date '+%Y年%-m月%-d日 星期%(%u)T 00:00' | sed "s/星期7/星期日/;s/星期1/星期一/;s/星期2/星期二/;s/星期3/星期三/;s/星期4/星期四/;s/星期5/星期五/;s/星期6/星期六/")
+          # 3. 组装消息
+          DATE_STR=$(TZ=Asia/Shanghai date '+%Y年%m月%d日 %H:%M')
+          
+          MSG="# 🌤 每日天气通报
+**桂林奥迪店 - ${DATE_STR}**
 
+> 今日：${TEXT}，${TEMP}℃，${WINDDIR}${WINDSCALE}级
+> 灾害预警：${WARNING_LINE}
 
-          content="# 🌤 每日天气通报
-**桂林奥迪店 - $date_str**
+**现场提示**
+- 商品车/展车无淋雨风险，洗车、客户接待、外拓正常开展。
+- 员工早晚备薄外套，午间按温度调整展厅制冷。"
 
-> 今日：$text，$temp℃，${windDir}${windScale}级
-> 湿度：$humidity%
-> 灾害预警：$warning_line
-
-> 本消息由 GitHub Actions 自动推送"
-
-          payload=$(jq -n --arg c "$content" '{msgtype:"markdown",markdown:{content:$c}}')
-
-          curl -s -X POST \
-            "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=$WECOM_KEY" \
+          # 4. 发送到企业微信
+          PAYLOAD=$(jq -n --arg c "$MSG" '{msgtype:"markdown",markdown:{content:$c}}')
+          
+          curl -s -X POST "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECOM_KEY}" \
             -H "Content-Type: application/json" \
-            -d "$payload"
+            -d "$PAYLOAD"
