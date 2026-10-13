@@ -3,7 +3,7 @@ name: 桂林奥迪店每日天气推送
 on:
   schedule:
     - cron: '0 7 * * *'
-    - cron: '0 11 * * *'
+    - cron: '30 11 * * *'
     - cron: '0 16 * * *'
   workflow_dispatch:
 
