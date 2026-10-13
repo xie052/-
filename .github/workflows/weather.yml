@@ -10,10 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
       - name: 安装 jq
         run: sudo apt-get update && sudo apt-get install -y jq
-        
+
       - name: 获取天气并发送
         env:
           QWEATHER_KEY: ${{ secrets.QWEATHER_KEY }}
@@ -22,38 +21,42 @@ jobs:
         run: |
           set +e
           DATE_STR=$(TZ=Asia/Shanghai date '+%Y年%m月%d日 %H:%M')
-          
-          WEATHER_RAW=$(curl -s "https://devapi.qweather.com/v7/weather/now?location=101300501&key=${QWEATHER_KEY}")
-          echo "天气接口原始返回: $WEATHER_RAW"
-          WEATHER_CODE=$(echo "$WEATHER_RAW" | jq -r '.code // "无code字段"' 2>/dev/null)
-          WEATHER=$(echo "$WEATHER_RAW" | tr -d '\000-\010\013-\037' | iconv -f UTF-8 -t UTF-8//IGNORE)
-          
-          if [ "$WEATHER_CODE" != "200" ] || ! echo "$WEATHER" | jq -e '.now' >/dev/null 2>&1; then
-            TEXT="接口异常(${WEATHER_CODE})"; TEMP="--"; WINDDIR="--"; WINDSCALE="--"
+
+          WEATHER=$(curl -s --compressed -H "X-QW-Api-Key: ${QWEATHER_KEY}" \
+            "https://devapi.qweather.com/v7/weather/now?location=101300501")
+
+          echo "天气原始返回: $WEATHER"
+
+          CODE=$(echo "$WEATHER" | jq -r '.code // "null"')
+
+          if [ "$CODE" = "200" ]; then
+            TEXT=$(echo "$WEATHER" | jq -r '.now.text')
+            TEMP=$(echo "$WEATHER" | jq -r '.now.temp')
+            WINDDIR=$(echo "$WEATHER" | jq -r '.now.windDir')
+            WINDSCALE=$(echo "$WEATHER" | jq -r '.now.windScale')
           else
-            TEXT=$(echo "$WEATHER" | jq -r '.now.text // "未知"')
-            TEMP=$(echo "$WEATHER" | jq -r '.now.temp // "--"')
-            WINDDIR=$(echo "$WEATHER" | jq -r '.now.windDir // "--"')
-            WINDSCALE=$(echo "$WEATHER" | jq -r '.now.windScale // "--"')
+            TEXT="天气接口异常(code=$CODE)"
+            TEMP="--"; WINDDIR="--"; WINDSCALE="--"
           fi
-          
-          WARNING_RAW=$(curl -s "https://devapi.qweather.com/v7/warning/now?location=101300501&key=${QWEATHER_KEY}")
-          echo "预警接口原始返回: $WARNING_RAW"
-          WARNING_CODE=$(echo "$WARNING_RAW" | jq -r '.code // "无code字段"' 2>/dev/null)
-          WARNING=$(echo "$WARNING_RAW" | tr -d '\000-\010\013-\037' | iconv -f UTF-8 -t UTF-8//IGNORE)
-          
-          if [ "$WARNING_CODE" != "200" ] || ! echo "$WARNING" | jq -e '.warningList' >/dev/null 2>&1; then
-            WARNING_LINE="接口异常(${WARNING_CODE})"
+
+          WARN=$(curl -s --compressed -H "X-QW-Api-Key: ${QWEATHER_KEY}" \
+            "https://devapi.qweather.com/v7/warning/now?location=101300501")
+          WCODE=$(echo "$WARN" | jq -r '.code // "null"')
+
+          if [ "$WCODE" = "200" ]; then
+            WTITLE=$(echo "$WARN" | jq -r '.warningList[0].title // empty')
+            if [ -z "$WTITLE" ]; then WARNING_LINE="无"; else WARNING_LINE="$WTITLE"; fi
           else
-            WARNING_TITLE=$(echo "$WARNING" | jq -r '.warningList[0].title // empty')
-            if [ -z "$WARNING_TITLE" ]; then WARNING_LINE="无"; else WARNING_LINE="$WARNING_TITLE"; fi
+            WARNING_LINE="预警接口异常(code=$WCODE)"
           fi
-          
-          MSG="【每日天气通报】\n桂林奥迪店 - ${DATE_STR}\n今日：${TEXT}，${TEMP}℃，${WINDDIR}${WINDSCALE}级\n灾害预警：${WARNING_LINE}\n\n商品车/展车无淋雨风险，洗车、客户接待、外拓正常。\n员工早晚备薄外套，午间按温度调整展厅制冷。"
-          echo -e "准备发送:\n$MSG"
-          
-          # 改回 text 模式，确保 \n 完美换行
+
+          MSG="【每日天气通报】
+桂林奥迪店 - ${DATE_STR}
+今日：${TEXT}，${TEMP}℃，风${WINDDIR}${WINDSCALE}级
+灾害预警：${WARNING_LINE}
+
           PAYLOAD=$(jq -n --arg c "$MSG" '{msgtype:"text",text:{content:$c}}')
-          curl -s -X POST "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECOM_KEY}" -H "Content-Type: application/json" -d "$PAYLOAD"
-          
-          echo "流程结束"
+          curl -s -X POST "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECOM_KEY}" \
+            -H "Content-Type: application/json" -d "$PAYLOAD"
+
+          echo "完成"
