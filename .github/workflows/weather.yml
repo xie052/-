@@ -3,7 +3,7 @@ name: 桂林奥迪店每日天气推送
 on:
   schedule:
     - cron: '0 23 * * *'   # UTC 23:00 = 北京时间 07:00
-    - cron: '45 3 * * *'    # UTC 03:00 = 北京时间 11:00
+    - cron: '00 4 * * *'    # UTC 03:00 = 北京时间 12:00
     - cron: '0 7 * * *'   # UTC 07:00 = 北京时间 15:00
   workflow_dispatch:
 
