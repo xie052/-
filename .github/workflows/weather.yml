@@ -9,29 +9,44 @@ jobs:
   send-weather:
     runs-on: ubuntu-latest
     steps:
-      - name: 发送天气到企业微信
+      - uses: actions/checkout@v3
+      
+      - name: 安装 jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+        
+      - name: 获取天气并发送
         env:
           QWEATHER_KEY: ${{ secrets.QWEATHER_KEY }}
           WECOM_KEY: ${{ secrets.WECOM_KEY }}
         run: |
-          # 1. 获取实时天气
+          echo "=== 开始获取天气 ==="
+          
+          # 获取实时天气
           WEATHER=$(curl -s "https://devapi.qweather.com/v7/weather/now?location=101300501&key=${QWEATHER_KEY}")
+          echo "天气响应: $WEATHER"
+          
           TEXT=$(echo "$WEATHER" | jq -r '.now.text')
           TEMP=$(echo "$WEATHER" | jq -r '.now.temp')
           WINDDIR=$(echo "$WEATHER" | jq -r '.now.windDir')
           WINDSCALE=$(echo "$WEATHER" | jq -r '.now.windScale')
-
-          # 2. 获取预警
+          
+          echo "解析结果: $TEXT $TEMP℃ $WINDDIR$WINDSCALE级"
+          
+          # 获取预警
           WARNING=$(curl -s "https://devapi.qweather.com/v7/warning/now?location=101300501&key=${QWEATHER_KEY}")
+          echo "预警响应: $WARNING"
+          
           WARNING_TITLE=$(echo "$WARNING" | jq -r '.warningList[0].title // empty')
-
+          
           if [ -z "$WARNING_TITLE" ]; then
             WARNING_LINE='<font color="info">无</font>'
+            echo "预警: 无"
           else
             WARNING_LINE="<font color=\"warning\">${WARNING_TITLE}</font>"
+            echo "预警: $WARNING_TITLE"
           fi
-
-          # 3. 组装消息
+          
+          # 组装消息
           DATE_STR=$(TZ=Asia/Shanghai date '+%Y年%m月%d日 %H:%M')
           
           MSG="# 🌤 每日天气通报
@@ -43,10 +58,16 @@ jobs:
 **现场提示**
 - 商品车/展车无淋雨风险，洗车、客户接待、外拓正常开展。
 - 员工早晚备薄外套，午间按温度调整展厅制冷。"
-
-          # 4. 发送到企业微信
+          
+          echo "=== 消息内容 ==="
+          echo "$MSG"
+          
+          # 发送到企业微信
+          echo "=== 开始发送 ==="
           PAYLOAD=$(jq -n --arg c "$MSG" '{msgtype:"markdown",markdown:{content:$c}}')
           
-          curl -s -X POST "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECOM_KEY}" \
+          RESPONSE=$(curl -s -X POST "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECOM_KEY}" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
+            -d "$PAYLOAD")
+          
+          echo "发送结果: $RESPONSE"
