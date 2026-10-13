@@ -24,11 +24,9 @@ jobs:
 
           WEATHER=$(curl -s --compressed -H "X-QW-Api-Key: ${QWEATHER_KEY}" \
             "https://devapi.qweather.com/v7/weather/now?location=101300501")
-
           echo "天气原始返回: $WEATHER"
 
           CODE=$(echo "$WEATHER" | jq -r '.code // "null"')
-
           if [ "$CODE" = "200" ]; then
             TEXT=$(echo "$WEATHER" | jq -r '.now.text')
             TEMP=$(echo "$WEATHER" | jq -r '.now.temp')
@@ -50,10 +48,17 @@ jobs:
             WARNING_LINE="预警接口异常(code=$WCODE)"
           fi
 
-          MSG="【每日天气通报】
-桂林奥迪店 - ${DATE_STR}
-今日：${TEXT}，${TEMP}℃，风${WINDDIR}${WINDSCALE}级
-灾害预警：${WARNING_LINE}
+          # 使用 jq 拼接多行文本，彻底避免 YAML 换行与引号转义报错
+          MSG=$(jq -n \
+            --arg date "$DATE_STR" \
+            --arg text "$TEXT" \
+            --arg temp "$TEMP" \
+            --arg winddir "$WINDDIR" \
+            --arg windscl "$WINDSCALE" \
+            --arg warn "$WARNING_LINE" \
+            '"【每日天气通报】\n桂林奥迪店 - " + $date + "\n今日：" + $text + "，" + $temp + "℃，风" + $winddir + $windscl + "级\n灾害预警：" + $warn + "\n\n商品车/展车无淋雨风险，洗车、客户接待、外拓正常。\n员工早晚备薄外套，午间按温度调整展厅制冷。"')
+
+          echo -e "准备发送:\n$(echo "$MSG" | jq -r '.')"
 
           PAYLOAD=$(jq -n --arg c "$MSG" '{msgtype:"text",text:{content:$c}}')
           curl -s -X POST "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECOM_KEY}" \
