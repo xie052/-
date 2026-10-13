@@ -7,9 +7,9 @@ on:
 
 jobs:
   send-weather:
-    runs-on: ubuntu-24.04 # 保持环境稳定，消除 Ubuntu 26 迁移通知
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5 # 升级至 v5，彻底消除 Node 20 弃用警告
+      - uses: actions/checkout@v5
       - name: 安装 jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
@@ -21,7 +21,18 @@ jobs:
         shell: bash
         run: |
           set +e
-          DATE_STR=$(TZ=Asia/Shanghai date '+%Y年%m月%d日 %H:%M')
+          # 日期格式：2026年10月13日 星期二
+          WEEKDAY=$(TZ=Asia/Shanghai date '+%w')
+          case $WEEKDAY in
+            0) CN_WEEK="星期日";;
+            1) CN_WEEK="星期一";;
+            2) CN_WEEK="星期二";;
+            3) CN_WEEK="星期三";;
+            4) CN_WEEK="星期四";;
+            5) CN_WEEK="星期五";;
+            6) CN_WEEK="星期六";;
+          esac
+          DATE_STR=$(TZ=Asia/Shanghai date "+%Y年%m月%d日 ${CN_WEEK}")
 
           # 1. 实时天气
           WEATHER=$(curl -s --compressed "https://${QW_HOST}/v7/weather/now?location=101300501&key=${QWEATHER_KEY}")
@@ -35,7 +46,7 @@ jobs:
             TEXT="天气接口异常(code=$CODE)"; TEMP="--"; WINDDIR="--"; WINDSCALE="--"
           fi
 
-          # 2. 灾害预警（修复 null 与 zeroResult 判断）
+          # 2. 灾害预警
           WARN=$(curl -s --compressed "https://${QW_HOST}/weatheralert/v1/current/25.27/110.29?key=${QWEATHER_KEY}")
           echo "预警原始返回: $WARN"
           ZERORESULT=$(echo "$WARN" | jq -r '.metadata.zeroResult // false')
@@ -44,13 +55,12 @@ jobs:
           if [ "$ZERORESULT" = "true" ] || [ -z "$WTITLE" ]; then
             WARNING_LINE="无"
           else
-            # 若未来接口恢复 code 字段，保留兼容；否则展示具体预警
             WARNING_LINE="${WTITLE:-预警接口异常}"
           fi
 
-          # 3. 拼接消息（已去掉末尾提示语）
-          MSG=$(jq -R -n --arg date "$DATE_STR" --arg text "$TEXT" --arg temp "$TEMP" --arg winddir "$WINDDIR" --arg windscl "$WINDSCALE" --arg warn "$WARNING_LINE" \
-            '("【每日天气通报】\n桂林奥迪店 - " + $date + "\n今日：" + $text + "，" + $temp + "℃，风" + $winddir + $windscl + "级\n灾害预警：" + $warn)')
+          # 3. 拼接消息（真实换行，企微完美排版）
+          MSG=$(printf "【每日天气通报】\n桂林奥迪店 - %s\n今日：%s，%s℃，风%s%s级\n灾害预警：%s" \
+            "$DATE_STR" "$TEXT" "$TEMP" "$WINDDIR" "$WINDSCALE" "$WARNING_LINE")
           
           echo -e "准备发送:\n$MSG"
           PAYLOAD=$(jq -n --arg c "$MSG" '{msgtype:"text",text:{content:$c}}')
