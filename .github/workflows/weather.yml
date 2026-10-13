@@ -21,7 +21,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          # 日期格式：2026年10月13日 星期二
+          # 日期格式：2026年10月13日 星期二（无具体时间）
           WEEKDAY=$(TZ=Asia/Shanghai date '+%w')
           case $WEEKDAY in
             0) CN_WEEK="星期日";;
@@ -58,8 +58,8 @@ jobs:
             WARNING_LINE="${WTITLE:-预警接口异常}"
           fi
 
-          # 3. 拼接消息（真实换行，企微完美排版）
-          MSG=$(printf "【每日天气通报】\n桂林奥迪店 - %s\n今日：%s，%s℃，风%s%s级\n灾害预警：%s" \
+          # 3. 拼接消息（今日改为今日天气，温度前加气温）
+          MSG=$(printf "【每日天气通报】\n桂林奥迪店 - %s\n今日天气：%s，气温%s℃，风%s%s级\n灾害预警：%s" \
             "$DATE_STR" "$TEXT" "$TEMP" "$WINDDIR" "$WINDSCALE" "$WARNING_LINE")
           
           echo -e "准备发送:\n$MSG"
