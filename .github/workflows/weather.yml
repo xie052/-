@@ -39,32 +39,30 @@ jobs:
           WARNING_TITLE=$(echo "$WARNING" | jq -r '.warningList[0].title // empty')
           
           if [ -z "$WARNING_TITLE" ]; then
-            WARNING_LINE='<font color="info">无</font>'
+            WARNING_LINE='无'
             echo "预警: 无"
           else
-            WARNING_LINE="<font color=\"warning\">${WARNING_TITLE}</font>"
+            WARNING_LINE="${WARNING_TITLE}"
             echo "预警: $WARNING_TITLE"
           fi
           
-          # 组装消息
+          # 组装消息（纯文本版，最稳）
           DATE_STR=$(TZ=Asia/Shanghai date '+%Y年%m月%d日 %H:%M')
           
-          MSG="# 🌤 每日天气通报
-**桂林奥迪店 - ${DATE_STR}**
+          MSG="【每日天气通报】
+桂林奥迪店 - ${DATE_STR}
+今日：${TEXT}，${TEMP}℃，${WINDDIR}${WINDSCALE}级
+灾害预警：${WARNING_LINE}
 
-> 今日：${TEXT}，${TEMP}℃，${WINDDIR}${WINDSCALE}级
-> 灾害预警：${WARNING_LINE}
-
-**现场提示**
-- 商品车/展车无淋雨风险，洗车、客户接待、外拓正常开展。
-- 员工早晚备薄外套，午间按温度调整展厅制冷。"
+商品车/展车无淋雨风险，洗车、客户接待、外拓正常。
+员工早晚备薄外套，午间按温度调整展厅制冷。"
           
           echo "=== 消息内容 ==="
           echo "$MSG"
           
           # 发送到企业微信
           echo "=== 开始发送 ==="
-          PAYLOAD=$(jq -n --arg c "$MSG" '{msgtype:"markdown",markdown:{content:$c}}')
+          PAYLOAD=$(jq -n --arg c "$MSG" '{msgtype:"text",text:{content:$c}}')
           
           RESPONSE=$(curl -s -X POST "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECOM_KEY}" \
             -H "Content-Type: application/json" \
