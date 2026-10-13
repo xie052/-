@@ -8,4 +8,8 @@ jobs:
   t:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "schedule ok"
+      - name: Show trigger
+        run: |
+          echo "github.event_name=${{ github.event_name }}"
+          echo "github.ref=${{ github.ref }}"
+          echo "schedule ok"
