@@ -25,7 +25,6 @@ jobs:
 
           # 1. 实时天气（已验证成功）
           WEATHER=$(curl -s --compressed "https://${QW_HOST}/v7/weather/now?location=101300501&key=${QWEATHER_KEY}")
-          echo "天气原始返回: $WEATHER"
           CODE=$(echo "$WEATHER" | jq -r '.code // "null"')
 
           if [ "$CODE" = "200" ]; then
@@ -38,21 +37,25 @@ jobs:
             TEMP="--"; WINDDIR="--"; WINDSCALE="--"
           fi
 
-          # 2. 灾害预警（修正为 v7/warning/now，配合专属 Host）
-          WARN=$(curl -s --compressed "https://${QW_HOST}/v7/warning/now?location=101300501&key=${QWEATHER_KEY}")
+          # 2. 灾害预警（官方新接口：/weatheralert/v1/current/纬度/经度）
+          WARN=$(curl -s --compressed "https://${QW_HOST}/weatheralert/v1/current/25.27/110.29?key=${QWEATHER_KEY}")
           echo "预警原始返回: $WARN"
           WCODE=$(echo "$WARN" | jq -r '.code // "null"')
 
           if [ "$WCODE" = "200" ]; then
-            WTITLE=$(echo "$WARN" | jq -r '.warningList[0].title // empty')
-            if [ -z "$WTITLE" ]; then WARNING_LINE="无"; else WARNING_LINE="$WTITLE"; fi
-          elif [ "$WCODE" = "204" ]; then
-            WARNING_LINE="无"
+            # 新接口返回结构为 alerts[]，标题为 headline
+            WTITLE=$(echo "$WARN" | jq -r '.alerts[0].headline // empty')
+            ZERORESULT=$(echo "$WARN" | jq -r '.metadata.zeroResult // false')
+            if [ -z "$WTITLE" ] || [ "$ZERORESULT" = "true" ]; then
+              WARNING_LINE="无"
+            else
+              WARNING_LINE="$WTITLE"
+            fi
           else
             WARNING_LINE="预警接口异常(code=$WCODE)"
           fi
 
-          # 3. 拼接消息（jq 处理换行）
+          # 3. 拼接消息（jq 处理换行，企微 text 模式）
           MSG=$(jq -n \
             --arg date "$DATE_STR" \
             --arg text "$TEXT" \
@@ -60,7 +63,7 @@ jobs:
             --arg winddir "$WINDDIR" \
             --arg windscl "$WINDSCALE" \
             --arg warn "$WARNING_LINE" \
-            '"【每日天气通报】\n桂林奥迪店 - " + $date + "\n今日：" + $text + "，" + $temp + "℃，风" + $winddir + $windscl + "级\n灾害预警：" + $warn + "\n\n商品车/展车无淋雨风险，洗车、客户接待、外拓正常。\n员工早晚备薄外套，午间按温度调整展厅制冷。"')
+            '【每日天气通报】\n桂林奥迪店 - " + $date + "\n今日：" + $text + "，" + $temp + "℃，风" + $winddir + $windscl + "级\n灾害预警：" + $warn + "\n')
 
           echo -e "准备发送:\n$(echo "$MSG" | jq -r '.')"
 
