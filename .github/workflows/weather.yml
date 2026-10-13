@@ -59,7 +59,7 @@ jobs:
           fi
 
           # 3. 拼接消息（今日改为今日天气，温度前加气温）
-          MSG=$(printf "【每日天气通报】\n桂林奥迪店 - %s\n今日天气：%s，气温%s℃，风%s%s级\n灾害预警：%s" \
+          MSG=$(printf "【每日天气通报】\n桂林奥迪店 - %s\n今日天气：%s，气温%s℃，%s%s级\n灾害预警：%s" \
             "$DATE_STR" "$TEXT" "$TEMP" "$WINDDIR" "$WINDSCALE" "$WARNING_LINE")
           
           echo -e "准备发送:\n$MSG"
