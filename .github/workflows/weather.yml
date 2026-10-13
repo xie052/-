@@ -20,17 +20,33 @@ jobs:
           WECOM_KEY: ${{ secrets.WECOM_KEY }}
         shell: bash
         run: |
-          set -e
-          WEATHER=$(curl -s "https://devapi.qweather.com/v7/weather/now?location=101300501&key=${QWEATHER_KEY}" | tr -d '\000' | iconv -f UTF-8 -t UTF-8//IGNORE)
-          TEXT=$(echo "$WEATHER" | jq -r '.now.text // "未知"')
-          TEMP=$(echo "$WEATHER" | jq -r '.now.temp // "未知"')
-          WINDDIR=$(echo "$WEATHER" | jq -r '.now.windDir // "未知"')
-          WINDSCALE=$(echo "$WEATHER" | jq -r '.now.windScale // "未知"')
-          WARNING=$(curl -s "https://devapi.qweather.com/v7/warning/now?location=101300501&key=${QWEATHER_KEY}" | tr -d '\000' | iconv -f UTF-8 -t UTF-8//IGNORE)
-          WARNING_TITLE=$(echo "$WARNING" | jq -r '.warningList[0].title // empty')
-          if [ -z "$WARNING_TITLE" ]; then WARNING_LINE="无"; else WARNING_LINE="$WARNING_TITLE"; fi
+          set +e
           DATE_STR=$(TZ=Asia/Shanghai date '+%Y年%m月%d日 %H:%M')
+          
+          WEATHER_RAW=$(curl -s "https://devapi.qweather.com/v7/weather/now?location=101300501&key=${QWEATHER_KEY}")
+          WEATHER=$(echo "$WEATHER_RAW" | tr -d '\000-\010\013-\037' | iconv -f UTF-8 -t UTF-8//IGNORE)
+          if ! echo "$WEATHER" | jq -e '.now' >/dev/null 2>&1; then
+            TEXT="接口异常"; TEMP="--"; WINDDIR="--"; WINDSCALE="--"
+          else
+            TEXT=$(echo "$WEATHER" | jq -r '.now.text // "未知"')
+            TEMP=$(echo "$WEATHER" | jq -r '.now.temp // "--"')
+            WINDDIR=$(echo "$WEATHER" | jq -r '.now.windDir // "--"')
+            WINDSCALE=$(echo "$WEATHER" | jq -r '.now.windScale // "--"')
+          fi
+          
+          WARNING_RAW=$(curl -s "https://devapi.qweather.com/v7/warning/now?location=101300501&key=${QWEATHER_KEY}")
+          WARNING=$(echo "$WARNING_RAW" | tr -d '\000-\010\013-\037' | iconv -f UTF-8 -t UTF-8//IGNORE)
+          if ! echo "$WARNING" | jq -e '.warningList' >/dev/null 2>&1; then
+            WARNING_LINE="接口异常"
+          else
+            WARNING_TITLE=$(echo "$WARNING" | jq -r '.warningList[0].title // empty')
+            if [ -z "$WARNING_TITLE" ]; then WARNING_LINE="无"; else WARNING_LINE="$WARNING_TITLE"; fi
+          fi
+          
           MSG="【每日天气通报】\n桂林奥迪店 - ${DATE_STR}\n今日：${TEXT}，${TEMP}℃，${WINDDIR}${WINDSCALE}级\n灾害预警：${WARNING_LINE}\n\n商品车/展车无淋雨风险，洗车、客户接待、外拓正常。\n员工早晚备薄外套，午间按温度调整展厅制冷。"
-          echo -e "$MSG"
+          echo -e "准备发送:\n$MSG"
+          
           PAYLOAD=$(jq -n --arg c "$MSG" '{msgtype:"text",text:{content:$c}}')
           curl -s -X POST "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECOM_KEY}" -H "Content-Type: application/json" -d "$PAYLOAD"
+          
+          echo "流程结束"
