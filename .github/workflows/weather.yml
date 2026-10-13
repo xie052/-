@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          # 日期格式：2026年10月13日 星期二（无具体时间）
+          # 日期格式：2026年10月13日 星期二
           WEEKDAY=$(TZ=Asia/Shanghai date '+%w')
           case $WEEKDAY in
             0) CN_WEEK="星期日";;
