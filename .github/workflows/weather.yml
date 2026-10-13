@@ -18,51 +18,22 @@ jobs:
         env:
           QWEATHER_KEY: ${{ secrets.QWEATHER_KEY }}
           WECOM_KEY: ${{ secrets.WECOM_KEY }}
+        shell: bash
         run: |
-          echo "=== 开始获取天气 ==="
-          
           WEATHER=$(curl -s "https://devapi.qweather.com/v7/weather/now?location=101300501&key=${QWEATHER_KEY}")
-          echo "天气响应: $WEATHER"
-          
           TEXT=$(echo "$WEATHER" | jq -r '.now.text')
           TEMP=$(echo "$WEATHER" | jq -r '.now.temp')
           WINDDIR=$(echo "$WEATHER" | jq -r '.now.windDir')
           WINDSCALE=$(echo "$WEATHER" | jq -r '.now.windScale')
-          
-          echo "解析结果: $TEXT $TEMP℃ $WINDDIR$WINDSCALE级"
-          
           WARNING=$(curl -s "https://devapi.qweather.com/v7/warning/now?location=101300501&key=${QWEATHER_KEY}")
-          echo "预警响应: $WARNING"
-          
           WARNING_TITLE=$(echo "$WARNING" | jq -r '.warningList[0].title // empty')
-          
           if [ -z "$WARNING_TITLE" ]; then
             WARNING_LINE="无"
           else
             WARNING_LINE="$WARNING_TITLE"
           fi
-          
           DATE_STR=$(TZ=Asia/Shanghai date '+%Y年%m月%d日 %H:%M')
-          
-          cat > /tmp/msg.txt << EOF
-【每日天气通报】
-桂林奥迪店 - ${DATE_STR}
-今日：${TEXT}，${TEMP}℃，${WINDDIR}${WINDSCALE}级
-灾害预警：${WARNING_LINE}
-
-商品车/展车无淋雨风险，洗车、客户接待、外拓正常。
-员工早晚备薄外套，午间按温度调整展厅制冷。
-EOF
-          
-          echo "=== 消息内容 ==="
-          cat /tmp/msg.txt
-          
-          echo "=== 开始发送 ==="
-          CONTENT=$(cat /tmp/msg.txt)
-          PAYLOAD=$(jq -n --arg c "$CONTENT" '{msgtype:"text",text:{content:$c}}')
-          
-          RESPONSE=$(curl -s -X POST "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECOM_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD")
-          
-          echo "发送结果: $RESPONSE"
+          MSG="【每日天气通报】\n桂林奥迪店 - ${DATE_STR}\n今日：${TEXT}，${TEMP}℃，${WINDDIR}${WINDSCALE}级\n灾害预警：${WARNING_LINE}\n\n商品车/展车无淋雨风险，洗车、客户接待、外拓正常。\n员工早晚备薄外套，午间按温度调整展厅制冷。"
+          echo "$MSG"
+          PAYLOAD=$(jq -n --arg c "$MSG" '{msgtype:"text",text:{content:$c}}')
+          curl -s -X POST "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECOM_KEY}" -H "Content-Type: application/json" -d "$PAYLOAD"
