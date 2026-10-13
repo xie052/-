@@ -2,9 +2,9 @@ name: 桂林奥迪店每日天气推送
 
 on:
   schedule:
-    - cron: '0 7 * * *'
-    - cron: '30 11 * * *'
-    - cron: '0 16 * * *'
+    - cron: '0 23 * * *'   # UTC 23:00 = 北京时间 07:00
+    - cron: '45 3 * * *'    # UTC 03:00 = 北京时间 11:00
+    - cron: '0 7 * * *'   # UTC 07:00 = 北京时间 15:00
   workflow_dispatch:
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          # 日期格式：2026年10月13日 星期二
+          # 日期格式：2026年10月13日 星期二（无具体时间）
           WEEKDAY=$(TZ=Asia/Shanghai date '+%w')
           case $WEEKDAY in
             0) CN_WEEK="星期日";;
@@ -48,8 +48,8 @@ jobs:
             TEXT="天气接口异常(code=$CODE)"; TEMP="--"; WINDDIR="--"; WINDSCALE="--"
           fi
 
-          # 2. 灾害预警110.172099,25.264846
-          WARN=$(curl -s --compressed "https://${QW_HOST}/weatheralert/v1/current/25.264846/110.172099?key=${QWEATHER_KEY}")
+          # 2. 灾害预警
+          WARN=$(curl -s --compressed "https://${QW_HOST}/weatheralert/v1/current/25.27/110.29?key=${QWEATHER_KEY}")
           echo "预警原始返回: $WARN"
           ZERORESULT=$(echo "$WARN" | jq -r '.metadata.zeroResult // false')
           WTITLE=$(echo "$WARN" | jq -r '.alerts[0].headline // empty')
