@@ -24,6 +24,7 @@ jobs:
           DATE_STR=$(TZ=Asia/Shanghai date '+%Y年%m月%d日 %H:%M')
           
           WEATHER_RAW=$(curl -s "https://devapi.qweather.com/v7/weather/now?location=101300501&key=${QWEATHER_KEY}")
+          echo "天气接口原始返回: $WEATHER_RAW"
           WEATHER=$(echo "$WEATHER_RAW" | tr -d '\000-\010\013-\037' | iconv -f UTF-8 -t UTF-8//IGNORE)
           if ! echo "$WEATHER" | jq -e '.now' >/dev/null 2>&1; then
             TEXT="接口异常"; TEMP="--"; WINDDIR="--"; WINDSCALE="--"
@@ -35,6 +36,7 @@ jobs:
           fi
           
           WARNING_RAW=$(curl -s "https://devapi.qweather.com/v7/warning/now?location=101300501&key=${QWEATHER_KEY}")
+          echo "预警接口原始返回: $WARNING_RAW"
           WARNING=$(echo "$WARNING_RAW" | tr -d '\000-\010\013-\037' | iconv -f UTF-8 -t UTF-8//IGNORE)
           if ! echo "$WARNING" | jq -e '.warningList' >/dev/null 2>&1; then
             WARNING_LINE="接口异常"
@@ -43,10 +45,10 @@ jobs:
             if [ -z "$WARNING_TITLE" ]; then WARNING_LINE="无"; else WARNING_LINE="$WARNING_TITLE"; fi
           fi
           
-          MSG="【每日天气通报】\n桂林奥迪店 - ${DATE_STR}\n今日：${TEXT}，${TEMP}℃，${WINDDIR}${WINDSCALE}级\n灾害预警：${WARNING_LINE}\n\n商品车/展车无淋雨风险，洗车、客户接待、外拓正常。\n员工早晚备薄外套，午间按温度调整展厅制冷。"
+          MSG="### 【每日天气通报】\n> 桂林奥迪店 - ${DATE_STR}\n\n**今日**：${TEXT}，${TEMP}℃，${WINDDIR}${WINDSCALE}级\n**灾害预警**：${WARNING_LINE}\n\n> 商品车/展车无淋雨风险，洗车、客户接待、外拓正常。\n> 员工早晚备薄外套，午间按温度调整展厅制冷。"
           echo -e "准备发送:\n$MSG"
           
-          PAYLOAD=$(jq -n --arg c "$MSG" '{msgtype:"text",text:{content:$c}}')
+          PAYLOAD=$(jq -n --arg c "$MSG" '{msgtype:"markdown",markdown:{content:$c}}')
           curl -s -X POST "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECOM_KEY}" -H "Content-Type: application/json" -d "$PAYLOAD"
           
           echo "流程结束"
