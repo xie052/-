@@ -21,7 +21,6 @@ jobs:
         run: |
           echo "=== 开始获取天气 ==="
           
-          # 获取实时天气
           WEATHER=$(curl -s "https://devapi.qweather.com/v7/weather/now?location=101300501&key=${QWEATHER_KEY}")
           echo "天气响应: $WEATHER"
           
@@ -32,37 +31,35 @@ jobs:
           
           echo "解析结果: $TEXT $TEMP℃ $WINDDIR$WINDSCALE级"
           
-          # 获取预警
           WARNING=$(curl -s "https://devapi.qweather.com/v7/warning/now?location=101300501&key=${QWEATHER_KEY}")
           echo "预警响应: $WARNING"
           
           WARNING_TITLE=$(echo "$WARNING" | jq -r '.warningList[0].title // empty')
           
           if [ -z "$WARNING_TITLE" ]; then
-            WARNING_LINE='无'
-            echo "预警: 无"
+            WARNING_LINE="无"
           else
-            WARNING_LINE="${WARNING_TITLE}"
-            echo "预警: $WARNING_TITLE"
+            WARNING_LINE="$WARNING_TITLE"
           fi
           
-          # 组装消息（纯文本版，最稳）
           DATE_STR=$(TZ=Asia/Shanghai date '+%Y年%m月%d日 %H:%M')
           
-          MSG="【每日天气通报】
+          cat > /tmp/msg.txt << EOF
+【每日天气通报】
 桂林奥迪店 - ${DATE_STR}
 今日：${TEXT}，${TEMP}℃，${WINDDIR}${WINDSCALE}级
 灾害预警：${WARNING_LINE}
 
 商品车/展车无淋雨风险，洗车、客户接待、外拓正常。
-员工早晚备薄外套，午间按温度调整展厅制冷。"
+员工早晚备薄外套，午间按温度调整展厅制冷。
+EOF
           
           echo "=== 消息内容 ==="
-          echo "$MSG"
+          cat /tmp/msg.txt
           
-          # 发送到企业微信
           echo "=== 开始发送 ==="
-          PAYLOAD=$(jq -n --arg c "$MSG" '{msgtype:"text",text:{content:$c}}')
+          CONTENT=$(cat /tmp/msg.txt)
+          PAYLOAD=$(jq -n --arg c "$CONTENT" '{msgtype:"text",text:{content:$c}}')
           
           RESPONSE=$(curl -s -X POST "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECOM_KEY}" \
             -H "Content-Type: application/json" \
