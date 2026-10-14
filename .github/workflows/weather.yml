@@ -88,12 +88,12 @@ jobs:
             TEMP_MAX="N/A"
           fi
 
-# 拼成 22～32℃
-if [ "$TEMP_MIN" != "N/A" ] && [ "$TEMP_MAX" != "N/A" ]; then
-  TEMP_RANGE="${TEMP_MIN}～${TEMP_MAX}℃"
-else
-  TEMP_RANGE="${TEMP}℃"
-fi
+          # 拼成 22～32℃
+          if [ "$TEMP_MIN" != "N/A" ] && [ "$TEMP_MAX" != "N/A" ]; then
+            TEMP_RANGE="${TEMP_MIN}～${TEMP_MAX}℃"
+          else
+            TEMP_RANGE="${TEMP}℃"
+          fi
 
           # 请求预警（也打印返回）
           WARN_RESP=$(curl -sS -w "\n%{http_code}" --compressed "https://${QW_HOST}/weatheralert/v1/current/25.27/110.29?key=${QWEATHER_KEY}")
