@@ -75,18 +75,18 @@ jobs:
           WINDDIR=$(echo "$WEATHER_BODY" | jq -r '.now.windDir // "N/A"' 2>/dev/null || echo "N/A")
           WINDSCALE=$(echo "$WEATHER_BODY" | jq -r '.now.windScale // "N/A"' 2>/dev/null || echo "N/A")
 
-# 新增：逐日预报（取今天最低/最高）
-FORECAST_RESP=$(curl -sS --compressed "https://${QW_HOST}/v7/weather/3d?location=101300501&key=${QWEATHER_KEY}")
-echo "预报接口 body: $FORECAST_RESP"
+          # 新增：逐日预报（取今天最低/最高）
+          FORECAST_RESP=$(curl -sS --compressed "https://${QW_HOST}/v7/weather/3d?location=101300501&key=${QWEATHER_KEY}")
+          echo "预报接口 body: $FORECAST_RESP"
 
-FCODE=$(echo "$FORECAST_RESP" | jq -r '.code // "null"')
-if [ "$FCODE" = "200" ]; then
-  TEMP_MIN=$(echo "$FORECAST_RESP" | jq -r '.daily[0].tempMin // "N/A"')
-  TEMP_MAX=$(echo "$FORECAST_RESP" | jq -r '.daily[0].tempMax // "N/A"')
-else
-  TEMP_MIN="N/A"
-  TEMP_MAX="N/A"
-fi
+          FCODE=$(echo "$FORECAST_RESP" | jq -r '.code // "null"')
+          if [ "$FCODE" = "200" ]; then
+            TEMP_MIN=$(echo "$FORECAST_RESP" | jq -r '.daily[0].tempMin // "N/A"')
+            TEMP_MAX=$(echo "$FORECAST_RESP" | jq -r '.daily[0].tempMax // "N/A"')
+          else
+            TEMP_MIN="N/A"
+            TEMP_MAX="N/A"
+          fi
 
 # 拼成 22～32℃
 if [ "$TEMP_MIN" != "N/A" ] && [ "$TEMP_MAX" != "N/A" ]; then
