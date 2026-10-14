@@ -75,6 +75,26 @@ jobs:
           WINDDIR=$(echo "$WEATHER_BODY" | jq -r '.now.windDir // "N/A"' 2>/dev/null || echo "N/A")
           WINDSCALE=$(echo "$WEATHER_BODY" | jq -r '.now.windScale // "N/A"' 2>/dev/null || echo "N/A")
 
+# 新增：逐日预报（取今天最低/最高）
+FORECAST_RESP=$(curl -sS --compressed "https://${QW_HOST}/v7/weather/3d?location=101300501&key=${QWEATHER_KEY}")
+echo "预报接口 body: $FORECAST_RESP"
+
+FCODE=$(echo "$FORECAST_RESP" | jq -r '.code // "null"')
+if [ "$FCODE" = "200" ]; then
+  TEMP_MIN=$(echo "$FORECAST_RESP" | jq -r '.daily[0].tempMin // "N/A"')
+  TEMP_MAX=$(echo "$FORECAST_RESP" | jq -r '.daily[0].tempMax // "N/A"')
+else
+  TEMP_MIN="N/A"
+  TEMP_MAX="N/A"
+fi
+
+# 拼成 22～32℃
+if [ "$TEMP_MIN" != "N/A" ] && [ "$TEMP_MAX" != "N/A" ]; then
+  TEMP_RANGE="${TEMP_MIN}～${TEMP_MAX}℃"
+else
+  TEMP_RANGE="${TEMP}℃"
+fi
+
           # 请求预警（也打印返回）
           WARN_RESP=$(curl -sS -w "\n%{http_code}" --compressed "https://${QW_HOST}/weatheralert/v1/current/25.27/110.29?key=${QWEATHER_KEY}")
           WARN_BODY=$(echo "$WARN_RESP" | sed '$d' || echo "")
@@ -89,8 +109,8 @@ jobs:
             WARNING_LINE="${WTITLE:-预警接口异常}"
           fi
 
-          MSG=$(printf "【每日天气通报】\n桂林奥迪店 - %s\n今日天气：%s，气温%s℃，%s%s级\n灾害预警：%s" \
-            "$DATE_STR" "$TEXT" "$TEMP" "$WINDDIR" "$WINDSCALE" "$WARNING_LINE")
+          MSG=$(printf "【每日天气通报】\n桂林奥迪店 - %s\n今日天气：%s，%s，%s%s级\n灾害预警：%s" \
+          "$DATE_STR" "$TEXT" "$TEMP_RANGE" "$WINDDIR" "$WINDSCALE" "$WARNING_LINE")
 
           echo -e "准备发送消息如下：\n$MSG"
 
