@@ -6,6 +6,7 @@ on:
   schedule:
     #- cron: '*/5 * * * *'   # 测试用：每 5 分钟一次（UTC）
      - cron: '0 6 * * *'    # UTC 06:00 = 北京时间 14:00
+     - cron: '0 23 * * *'    # UTC 23:00 = 北京时间 07:00
   workflow_dispatch:
 
 permissions:
